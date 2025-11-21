@@ -6,7 +6,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"><!-- Canva SDKs -->
   <script src="/_sdk/element_sdk.js"></script>
   <script src="/_sdk/data_sdk.js"></script><!-- Google Sign-In -->
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script><!-- Chatbase AI Integration -->
+  <script>
+(function(){if(!window.chatbase||window.chatbase("getState")!=="initialized"){window.chatbase=(...arguments)=>{if(!window.chatbase.q){window.chatbase.q=[]}window.chatbase.q.push(arguments)};window.chatbase=new Proxy(window.chatbase,{get(target,prop){if(prop==="q"){return target.q}return(...args)=>target(prop,...args)}})}const onLoad=function(){const script=document.createElement("script");script.src="https://www.chatbase.co/embed.min.js";script.id="L0PzG-hldBaavtCk3rPpb";script.domain="www.chatbase.co";document.body.appendChild(script)};if(document.readyState==="complete"){onLoad()}else{window.addEventListener("load",onLoad)}})();
+  </script>
   <style>
     body {
       box-sizing: border-box;
@@ -1659,11 +1662,11 @@
              🤖
             </div>
             <div class="ai-message-content">
-             <p>Hello! I'm your AI productivity assistant. I can help you manage tasks, analyze your workflow, and provide intelligent suggestions. How can I assist you today?</p>
+             <p>Hello! I'm your AI assistant. I can help you with math, coding, writing emails and blogs, creating business documents, and much more. How can I assist you today?</p>
             </div>
            </div>
           </div>
-          <form class="ai-chat-input-form" id="aiChatForm"><input type="text" class="ai-chat-input" id="aiChatInput" placeholder="Ask me anything..."> <button type="submit" class="ai-chat-send"> <span>➤</span> </button>
+          <form class="ai-chat-input-form" id="aiChatForm"><input type="text" class="ai-chat-input" id="aiChatInput" placeholder="Ask me anything..." required> <button type="submit" class="ai-chat-send">➤</button>
           </form>
          </div>
         </div>
@@ -2374,7 +2377,7 @@
         const botMsg = document.createElement("div");
         botMsg.className = "ai-message ai-message-bot";
         botMsg.innerHTML = `
-          <div class="ai-message-avatar">🤖</div>
+          <div class="ai-message-avatar">����</div>
           <div class="ai-message-content">
             <p>I understand you're asking about "${message}". As an AI assistant, I can help you with task management, productivity tips, and workflow optimization. What specific aspect would you like to explore?</p>
           </div>
@@ -2505,8 +2508,49 @@
       document.getElementById("statUsers").textContent = users.length;
     }
 
+    // Initialize Chatbase AI
+    let chatbaseInitialized = false;
+
+    function initializeChatbaseWidget() {
+      if (chatbaseInitialized) return;
+      
+      // Remove the default chat messages container
+      const aiChatMessages = document.getElementById("aiChatMessages");
+      const aiChatForm = document.getElementById("aiChatForm");
+      
+      if (aiChatMessages && aiChatForm) {
+        aiChatMessages.style.display = "none";
+        aiChatForm.style.display = "none";
+      }
+
+      // Create iframe container for Chatbase
+      const chatContainer = document.querySelector(".ai-chat-container");
+      if (!chatContainer) return;
+      
+      const chatbaseIframe = document.createElement("iframe");
+      chatbaseIframe.src = "https://www.chatbase.co/chatbot-iframe/L0PzG-hldBaavtCk3rPpb";
+      chatbaseIframe.style.cssText = "width: 100%; height: 100%; border: none; flex: 1;";
+      chatbaseIframe.title = "Chatbase AI Assistant";
+      
+      // Insert after header
+      const header = chatContainer.querySelector(".ai-chat-header");
+      if (header && header.nextSibling) {
+        chatContainer.insertBefore(chatbaseIframe, header.nextSibling);
+      }
+      
+      chatbaseInitialized = true;
+    }
+
+    // Watch for AI tab activation
+    document.addEventListener("click", (e) => {
+      const tab = e.target.closest('[data-tab="ai"]');
+      if (tab) {
+        setTimeout(initializeChatbaseWidget, 500);
+      }
+    });
+
     // Check for existing session on load
     checkExistingSession();
   </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9a22e73654d3267c',t:'MTc2Mzc1NjU4OC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9a23117f16dd267c',t:'MTc2Mzc1ODMyMC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
