@@ -1653,7 +1653,7 @@
            </div>
            <div>
             <h3 class="ai-chat-title">AI Assistant</h3>
-            <p class="ai-chat-status">Online • Ready to help</p>
+            <p class="ai-chat-status">Online ��� Ready to help</p>
            </div>
           </div>
           <div class="ai-chat-messages" id="aiChatMessages">
@@ -1985,10 +1985,49 @@
         return;
       }
 
-      const name = email.split("@")[0];
-      currentUser = { email, name, method: "email" };
-      localStorage.setItem(AUTH_KEY, JSON.stringify(currentUser));
-      showMainApp();
+      if (isSignUpMode) {
+        // Sign up mode - validate password requirements
+        if (password.length < 8) {
+          showAuthMessage("Password must be at least 8 characters long", "error");
+          return;
+        }
+        if (!/[A-Z]/.test(password)) {
+          showAuthMessage("Password must contain at least one uppercase letter", "error");
+          return;
+        }
+        if (!/[0-9]/.test(password)) {
+          showAuthMessage("Password must contain at least one number", "error");
+          return;
+        }
+
+        // Store user credentials
+        const userCredentials = JSON.parse(localStorage.getItem("lenvoro_credentials") || "{}");
+        userCredentials[email] = password;
+        localStorage.setItem("lenvoro_credentials", JSON.stringify(userCredentials));
+
+        const name = email.split("@")[0];
+        currentUser = { email, name, method: "email" };
+        localStorage.setItem(AUTH_KEY, JSON.stringify(currentUser));
+        showMainApp();
+      } else {
+        // Sign in mode - verify password matches stored password
+        const userCredentials = JSON.parse(localStorage.getItem("lenvoro_credentials") || "{}");
+        
+        if (!userCredentials[email]) {
+          showAuthMessage("No account found with this email. Please sign up first.", "error");
+          return;
+        }
+
+        if (userCredentials[email] !== password) {
+          showAuthMessage("Incorrect password. Please try again.", "error");
+          return;
+        }
+
+        const name = email.split("@")[0];
+        currentUser = { email, name, method: "email" };
+        localStorage.setItem(AUTH_KEY, JSON.stringify(currentUser));
+        showMainApp();
+      }
     });
 
     // Logout
@@ -2064,6 +2103,8 @@
         adminUnlocked = true;
         adminPasswordForm.style.display = "none";
         adminContent.classList.add("unlocked");
+        loadUsers();
+        renderAdminUsers(allUsers);
         updateAdminStats();
       } else {
         adminAuthMessage.innerHTML = '<div class="message-box error">Incorrect password</div>';
@@ -2071,7 +2112,8 @@
     });
 
     function updateAdminStats() {
-      document.getElementById("statUsers").textContent = "1";
+      loadUsers();
+      document.getElementById("statUsers").textContent = allUsers.length;
       document.getElementById("statTasks").textContent = allTasks.length;
       document.getElementById("statCompleted").textContent = allTasks.filter(t => t.completed).length;
     }
@@ -2081,9 +2123,10 @@
     const taskList = document.getElementById("taskList");
     const addTaskBtn = document.getElementById("addTaskBtn");
 
-    let isDataSdkReady = false;
+    let isTaskDataSdkReady = false;
+    let taskDataSdk = null;
 
-    const dataHandler = {
+    const taskDataHandler = {
       onDataChanged(data) {
         allTasks = data;
         renderTasks(data);
@@ -2093,28 +2136,30 @@
       }
     };
 
-    async function initDataSdk() {
+    async function initTaskDataSdk() {
+      // Create a separate instance for tasks
       if (!window.dataSdk) {
         console.error("Data SDK not available");
         return;
       }
 
-      const result = await window.dataSdk.init(dataHandler);
+      // We'll use a namespace approach by prefixing task IDs
+      const result = await window.dataSdk.init(taskDataHandler);
       if (result.isOk) {
-        isDataSdkReady = true;
+        isTaskDataSdkReady = true;
+        taskDataSdk = window.dataSdk;
       } else {
-        console.error("Failed to initialize Data SDK");
+        console.error("Failed to initialize Task Data SDK");
       }
     }
 
-    initDataSdk();
-    initUserDataSdk();
+    initTaskDataSdk();
 
     // Task form submission
     taskForm.addEventListener("submit", async (e) => {
       e.preventDefault();
 
-      if (!isDataSdkReady) {
+      if (!isTaskDataSdkReady || !taskDataSdk) {
         return;
       }
 
@@ -2148,7 +2193,7 @@
         createdAt: new Date().toISOString()
       };
 
-      const result = await window.dataSdk.create(task);
+      const result = await taskDataSdk.create(task);
 
       if (result.isOk) {
         taskForm.reset();
@@ -2289,13 +2334,13 @@
     }
 
     async function updateTaskStatus(task, newStatus) {
-      if (!isDataSdkReady) return;
+      if (!isTaskDataSdkReady || !taskDataSdk) return;
 
       const updatedTask = Object.assign({}, task, { 
         status: newStatus,
         completed: newStatus === 'complete'
       });
-      const result = await window.dataSdk.update(updatedTask);
+      const result = await taskDataSdk.update(updatedTask);
 
       if (!result.isOk) {
         const msg = document.createElement("div");
@@ -2307,14 +2352,14 @@
     }
 
     async function toggleTaskComplete(task) {
-      if (!isDataSdkReady) return;
+      if (!isTaskDataSdkReady || !taskDataSdk) return;
 
       const newStatus = task.completed ? 'not-started' : 'complete';
       const updatedTask = Object.assign({}, task, { 
         completed: !task.completed,
         status: newStatus
       });
-      const result = await window.dataSdk.update(updatedTask);
+      const result = await taskDataSdk.update(updatedTask);
 
       if (!result.isOk) {
         const msg = document.createElement("div");
@@ -2326,14 +2371,14 @@
     }
 
     async function deleteTask(task) {
-      if (!isDataSdkReady) return;
+      if (!isTaskDataSdkReady || !taskDataSdk) return;
 
       const taskEl = document.querySelector(`[data-task-id="${task.__backendId}"]`);
       if (taskEl) {
         taskEl.style.opacity = "0.5";
       }
 
-      const result = await window.dataSdk.delete(task);
+      const result = await taskDataSdk.delete(task);
 
       if (!result.isOk) {
         if (taskEl) {
@@ -2387,43 +2432,33 @@
       }, 1000);
     });
 
-    // User management with Data SDK
+    // User management - using localStorage for simplicity
     const USERS_KEY = "lenvoro_users";
     let allUsers = [];
-    let isUserDataSdkReady = false;
 
-    const userDataHandler = {
-      onDataChanged(data) {
-        allUsers = data;
-        if (adminUnlocked) {
-          renderAdminUsers(data);
-          updateAdminStats();
+    function loadUsers() {
+      const stored = localStorage.getItem(USERS_KEY);
+      if (stored) {
+        try {
+          allUsers = JSON.parse(stored);
+        } catch (e) {
+          allUsers = [];
         }
-      }
-    };
-
-    async function initUserDataSdk() {
-      if (!window.dataSdk) {
-        console.error("Data SDK not available for users");
-        return;
-      }
-
-      const result = await window.dataSdk.init(userDataHandler);
-      if (result.isOk) {
-        isUserDataSdkReady = true;
-      } else {
-        console.error("Failed to initialize User Data SDK");
       }
     }
 
-    // Store user login
-    async function storeUserLogin(user) {
-      if (!isUserDataSdkReady) return;
+    function saveUsers() {
+      localStorage.setItem(USERS_KEY, JSON.stringify(allUsers));
+    }
 
-      // Check if user already exists
-      const existingUser = allUsers.find(u => u.email === user.email);
+    // Store user login
+    function storeUserLogin(user) {
+      loadUsers();
       
-      if (!existingUser) {
+      // Check if user already exists
+      const existingIndex = allUsers.findIndex(u => u.email === user.email);
+      
+      if (existingIndex === -1) {
         const userData = {
           email: user.email,
           name: user.name,
@@ -2431,13 +2466,17 @@
           loginMethod: user.method,
           lastLogin: new Date().toISOString()
         };
-        await window.dataSdk.create(userData);
+        allUsers.push(userData);
       } else {
         // Update last login
-        const updatedUser = Object.assign({}, existingUser, {
-          lastLogin: new Date().toISOString()
-        });
-        await window.dataSdk.update(updatedUser);
+        allUsers[existingIndex].lastLogin = new Date().toISOString();
+      }
+      
+      saveUsers();
+      
+      if (adminUnlocked) {
+        renderAdminUsers(allUsers);
+        updateAdminStats();
       }
     }
 
@@ -2455,7 +2494,7 @@
 
       adminUsersList.innerHTML = "";
       
-      users.forEach(user => {
+      users.forEach((user, index) => {
         const userCard = document.createElement("div");
         userCard.className = "admin-user-card";
         
@@ -2474,7 +2513,7 @@
             </div>
           </div>
           <div class="admin-user-actions">
-            <select class="admin-plan-select" data-user-id="${user.__backendId}">
+            <select class="admin-plan-select" data-user-index="${index}">
               <option value="starter" ${user.plan === 'starter' ? 'selected' : ''}>Starter Plan</option>
               <option value="pro" ${user.plan === 'pro' ? 'selected' : ''}>Pro Plan</option>
               <option value="business" ${user.plan === 'business' ? 'selected' : ''}>Business Plan</option>
@@ -2486,21 +2525,15 @@
         
         // Add event listener for plan change
         const planSelect = userCard.querySelector(".admin-plan-select");
-        planSelect.addEventListener("change", async (e) => {
+        planSelect.addEventListener("change", (e) => {
           const newPlan = e.target.value;
-          const updatedUser = Object.assign({}, user, { plan: newPlan });
+          const userIndex = parseInt(e.target.dataset.userIndex);
           
-          planSelect.disabled = true;
-          const result = await window.dataSdk.update(updatedUser);
-          planSelect.disabled = false;
-          
-          if (!result.isOk) {
-            const msg = document.createElement("div");
-            msg.className = "message-box error";
-            msg.textContent = "Failed to update user plan. Please try again.";
-            adminUsersList.insertBefore(msg, adminUsersList.firstChild);
-            setTimeout(() => msg.remove(), 3000);
-            e.target.value = user.plan;
+          loadUsers();
+          if (allUsers[userIndex]) {
+            allUsers[userIndex].plan = newPlan;
+            saveUsers();
+            renderAdminUsers(allUsers);
           }
         });
       });
@@ -2552,5 +2585,5 @@
     // Check for existing session on load
     checkExistingSession();
   </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9a23117f16dd267c',t:'MTc2Mzc1ODMyMC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9a2a744da6ee2ff6',t:'MTc2MzgzNTc2OC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
